@@ -19,7 +19,7 @@ from email.parser import BytesParser
 from typing import Any
 
 
-LOG = logging.getLogger("smtp2http")
+LOG = logging.getLogger("smtp2worker")
 
 
 @dataclass(frozen=True)
@@ -90,7 +90,7 @@ class SMTPConnection:
     async def serve(self) -> None:
         LOG.info("connection opened from %s", self.peer)
         try:
-            await self.reply(220, f"{self.config.hostname} smtp2http ready")
+            await self.reply(220, f"{self.config.hostname} smtp2worker ready")
             while not self.writer.is_closing():
                 line = await self.readline()
                 if line is None:
@@ -449,8 +449,8 @@ def post_to_worker(config: Config, payload: dict[str, Any]) -> UpstreamResult:
         headers={
             "Content-Type": "application/json; charset=utf-8",
             "Authorization": f"Bearer {config.bridge_token}",
-            "X-SMTP2HTTP-Token": config.bridge_token,
-            "User-Agent": "smtp2http/1.0",
+            "X-SMTP2WORKER-Token": config.bridge_token,
+            "User-Agent": "smtp2worker/1.0",
         },
     )
     try:
@@ -488,7 +488,7 @@ async def run(config: Config) -> None:
     )
 
     sockets = ", ".join(str(sock.getsockname()) for sock in server.sockets or [])
-    LOG.info("smtp2http listening on %s", sockets)
+    LOG.info("smtp2worker listening on %s", sockets)
     if config.auth_enabled:
         LOG.info("SMTP AUTH enabled for user %s", config.smtp_username)
     else:
@@ -499,14 +499,14 @@ async def run(config: Config) -> None:
 
 
 def parse_args(argv: list[str]) -> Config:
-    parser = argparse.ArgumentParser(description="SMTP to HTTP bridge for Cloudflare Worker mail delivery")
+    parser = argparse.ArgumentParser(description="SMTP to Cloudflare Worker mail bridge")
     parser.add_argument("--listen-host", default=os.getenv("SMTP_LISTEN_HOST", "127.0.0.1"))
     parser.add_argument("--listen-port", type=int, default=int(os.getenv("SMTP_LISTEN_PORT", "2525")))
     parser.add_argument("--worker-url", default=os.getenv("WORKER_URL"))
     parser.add_argument("--bridge-token", default=os.getenv("BRIDGE_TOKEN"))
     parser.add_argument("--smtp-username", default=os.getenv("SMTP_USERNAME"))
     parser.add_argument("--smtp-password", default=os.getenv("SMTP_PASSWORD"))
-    parser.add_argument("--hostname", default=os.getenv("SMTP_HOSTNAME", "smtp2http.local"))
+    parser.add_argument("--hostname", default=os.getenv("SMTP_HOSTNAME", "smtp2worker.local"))
     parser.add_argument("--http-timeout", type=float, default=float(os.getenv("HTTP_TIMEOUT", "15")))
     parser.add_argument("--max-message-bytes", type=int, default=int(os.getenv("MAX_MESSAGE_BYTES", str(1024 * 1024))))
     parser.add_argument("--tls-cert-file", default=os.getenv("TLS_CERT_FILE"))

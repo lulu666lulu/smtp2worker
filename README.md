@@ -1,4 +1,4 @@
-# smtp2http
+# smtp2worker
 
 一个小型 SMTP 到 HTTP 网关：旧工具只需要按普通 SMTP 发邮件，网关会把邮件解析成 JSON，转发给部署在 Cloudflare Workers 上的 HTTP 接口，再由 Worker 调用邮件服务商发送验证码邮件。
 
@@ -6,7 +6,7 @@
 
 ## 目录
 
-- `smtp2http.py`：SMTP 服务器，接收 `MAIL/RCPT/DATA` 后 POST 到 Worker。
+- `smtp2worker.py`：SMTP 服务器，接收 `MAIL/RCPT/DATA` 后 POST 到 Worker。
 - `worker/src/worker.js`：Cloudflare Worker，校验 token 后调用 Resend。
 - `config.example.env`：SMTP 网关环境变量示例。
 - `worker/wrangler.toml.example`：Worker 部署配置示例。
@@ -30,7 +30,7 @@ wrangler deploy
 `BRIDGE_TOKEN` 必须和 SMTP 网关使用的 `BRIDGE_TOKEN` 相同。部署完成后得到类似：
 
 ```text
-https://smtp2http-mail-worker.your-subdomain.workers.dev
+https://smtp2worker.your-subdomain.workers.dev
 ```
 
 ## 运行 SMTP 网关
@@ -38,8 +38,8 @@ https://smtp2http-mail-worker.your-subdomain.workers.dev
 本机直接运行，Python 3.8+ 即可：
 
 ```bash
-python smtp2http.py ^
-  --worker-url https://smtp2http-mail-worker.your-subdomain.workers.dev ^
+python smtp2worker.py ^
+  --worker-url https://smtp2worker.your-subdomain.workers.dev ^
   --bridge-token change-me-to-a-long-random-secret ^
   --smtp-username smtp-user ^
   --smtp-password smtp-password ^
@@ -64,7 +64,7 @@ Get-Content .env | ForEach-Object {
     [Environment]::SetEnvironmentVariable($name, $value, "Process")
   }
 }
-python .\smtp2http.py
+python .\smtp2worker.py
 ```
 
 旧工具里的 SMTP 配置：
@@ -83,13 +83,13 @@ Worker 默认使用 `FROM_EMAIL` 覆盖 SMTP 邮件里的 From，这是为了避
 ## Docker
 
 ```bash
-docker build -t smtp2http .
+docker build -t smtp2worker .
 docker run --rm -p 2525:2525 ^
-  -e WORKER_URL=https://smtp2http-mail-worker.your-subdomain.workers.dev ^
+  -e WORKER_URL=https://smtp2worker.your-subdomain.workers.dev ^
   -e BRIDGE_TOKEN=change-me-to-a-long-random-secret ^
   -e SMTP_USERNAME=smtp-user ^
   -e SMTP_PASSWORD=smtp-password ^
-  smtp2http
+  smtp2worker
 ```
 
 ## TLS
@@ -99,8 +99,8 @@ docker run --rm -p 2525:2525 ^
 STARTTLS 需要 Python 3.11+：
 
 ```bash
-python smtp2http.py ^
-  --worker-url https://smtp2http-mail-worker.your-subdomain.workers.dev ^
+python smtp2worker.py ^
+  --worker-url https://smtp2worker.your-subdomain.workers.dev ^
   --bridge-token change-me ^
   --smtp-username smtp-user ^
   --smtp-password smtp-password ^
@@ -142,7 +142,7 @@ Worker 支持两个认证头，二选一即可：
 
 ```text
 Authorization: Bearer <BRIDGE_TOKEN>
-X-SMTP2HTTP-Token: <BRIDGE_TOKEN>
+X-SMTP2WORKER-Token: <BRIDGE_TOKEN>
 ```
 
 ## 测试

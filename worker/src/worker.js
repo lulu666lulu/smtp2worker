@@ -5,7 +5,7 @@ const JSON_HEADERS = {
 export default {
   async fetch(request, env) {
     if (request.method === "GET") {
-      return json({ ok: true, service: "smtp2http-worker" });
+      return json({ ok: true, service: "smtp2worker" });
     }
 
     if (request.method !== "POST") {
@@ -75,8 +75,13 @@ function isAuthorized(request, env) {
     return false;
   }
   const authorization = request.headers.get("authorization") || "";
-  const headerToken = request.headers.get("x-smtp2http-token") || "";
-  return authorization === `Bearer ${env.BRIDGE_TOKEN}` || headerToken === env.BRIDGE_TOKEN;
+  const headerToken = request.headers.get("x-smtp2worker-token") || "";
+  const legacyHeaderToken = request.headers.get("x-smtp2http-token") || "";
+  return (
+    authorization === `Bearer ${env.BRIDGE_TOKEN}` ||
+    headerToken === env.BRIDGE_TOKEN ||
+    legacyHeaderToken === env.BRIDGE_TOKEN
+  );
 }
 
 function normalizeMail(payload, env) {

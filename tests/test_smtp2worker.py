@@ -2,7 +2,7 @@ import base64
 import unittest
 from email.message import EmailMessage
 
-from smtp2http import build_payload, extract_path
+from smtp2worker import build_payload, extract_path
 
 
 class PayloadTests(unittest.TestCase):
