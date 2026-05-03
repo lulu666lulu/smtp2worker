@@ -1,13 +1,13 @@
 # smtp2worker
 
-一个小型 SMTP 到 HTTP 网关：旧工具只需要按普通 SMTP 发邮件，网关会把邮件解析成 JSON，转发给部署在 Cloudflare Workers 上的 HTTP 接口，再由 Worker 调用邮件服务商发送验证码邮件。
+一个小型 SMTP 到 Cloudflare Worker 邮件网关：旧工具只需要按普通 SMTP 发邮件，网关会把邮件解析成 JSON，转发给部署在 Cloudflare Workers 上的 HTTP 接口，再由 Worker 通过 Cloudflare Email Routing 的 `send_email` binding 发送验证码邮件。
 
-默认实现使用 Resend 的 HTTP API 发送邮件；也可以按同样的 JSON 结构改成你自己的发信接口。
+这个版本使用 Cloudflare 原生 Email Workers 发信，不依赖 Resend 或其他第三方发信 API。
 
 ## 目录
 
 - `smtp2worker.py`：SMTP 服务器，接收 `MAIL/RCPT/DATA` 后 POST 到 Worker。
-- `worker/src/worker.js`：Cloudflare Worker，校验 token 后调用 Resend。
+- `worker/src/worker.js`：Cloudflare Worker，校验 token 后调用 Cloudflare `send_email` binding。
 - `config.example.env`：SMTP 网关环境变量示例。
 - `worker/wrangler.toml.example`：Worker 部署配置示例。
 
@@ -19,11 +19,19 @@
 cp wrangler.toml.example wrangler.toml
 ```
 
-把 `FROM_EMAIL` 改成你在 Resend 中已验证的发件地址。然后设置密钥：
+先在 Cloudflare 对应域名启用 Email Routing，并至少验证一个目标邮箱。`FROM_EMAIL` 必须是已启用 Email Routing 的域名下的发件地址，例如 `noreply@example.com`。
+
+复制 `wrangler.toml.example` 后，确认其中有 `[[send_email]]` binding：
+
+```toml
+[[send_email]]
+name = "SEND_EMAIL"
+```
+
+然后设置网关密钥并部署：
 
 ```bash
 wrangler secret put BRIDGE_TOKEN
-wrangler secret put RESEND_API_KEY
 wrangler deploy
 ```
 
@@ -75,10 +83,10 @@ Port: 2525
 Username: smtp-user
 Password: smtp-password
 Encryption: none
-From: 你在 Resend 验证过的发件地址
+From: 你在 Cloudflare Email Routing 域名下的发件地址
 ```
 
-Worker 默认使用 `FROM_EMAIL` 覆盖 SMTP 邮件里的 From，这是为了避免邮件服务商因为发件地址未验证而拒绝。
+Worker 默认使用 `FROM_EMAIL` 覆盖 SMTP 邮件里的 From，这是因为 Cloudflare 要求发件地址来自已启用 Email Routing 的域名。
 
 ## Docker
 

@@ -1,3 +1,5 @@
+import { EmailMessage } from "cloudflare:email";
+
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
 };
@@ -33,40 +35,31 @@ export default {
       return json({ ok: true, dryRun: true, to: mail.to, subject: mail.subject });
     }
 
-    if (!env.RESEND_API_KEY) {
-      return json({ ok: false, error: "missing_resend_api_key" }, 500);
+    if (!env.SEND_EMAIL || typeof env.SEND_EMAIL.send !== "function") {
+      return json({ ok: false, error: "missing_send_email_binding" }, 500);
     }
 
-    const resendResponse = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "authorization": `Bearer ${env.RESEND_API_KEY}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(mail),
-    });
-
-    const responseText = await resendResponse.text();
-    let responseBody;
-    try {
-      responseBody = responseText ? JSON.parse(responseText) : {};
-    } catch {
-      responseBody = { raw: responseText };
+    const sent = [];
+    for (const recipient of mail.to) {
+      const rawMessage = buildMimeMessage(mail, recipient);
+      const emailMessage = new EmailMessage(mail.from, recipient, rawMessage);
+      try {
+        await env.SEND_EMAIL.send(emailMessage);
+        sent.push(recipient);
+      } catch (error) {
+        return json(
+          {
+            ok: false,
+            error: "cloudflare_send_email_failed",
+            recipient,
+            message: error instanceof Error ? error.message : String(error),
+          },
+          502,
+        );
+      }
     }
 
-    if (!resendResponse.ok) {
-      return json(
-        {
-          ok: false,
-          error: "mail_provider_rejected",
-          providerStatus: resendResponse.status,
-          provider: responseBody,
-        },
-        resendResponse.status >= 400 && resendResponse.status < 500 ? 400 : 502,
-      );
-    }
-
-    return json({ ok: true, provider: responseBody });
+    return json({ ok: true, sent });
   },
 };
 
@@ -88,25 +81,23 @@ function normalizeMail(payload, env) {
   const envelope = payload?.envelope || {};
   const message = payload?.message || {};
   const to = normalizeRecipients(envelope.to || message.to);
-  const cc = normalizeRecipients(message.cc);
   const replyTo = firstHeaderAddress(message.replyTo);
-  const from = env.FROM_EMAIL || firstHeaderAddress(message.from) || envelope.from;
+  const fromHeader = env.FROM_EMAIL || message.from || envelope.from;
+  const from = firstHeaderAddress(fromHeader) || firstHeaderAddress(envelope.from);
   const text = message.text || (message.html ? stripHtml(message.html) : "");
   const html = message.html || (text ? textToHtml(text) : "");
 
   const mail = {
     from,
+    fromHeader,
     to,
     subject: message.subject || env.DEFAULT_SUBJECT || "Verification code",
     text,
     html,
   };
 
-  if (cc.length > 0) {
-    mail.cc = cc;
-  }
   if (replyTo) {
-    mail.reply_to = replyTo;
+    mail.replyTo = replyTo;
   }
 
   return mail;
@@ -160,6 +151,90 @@ function firstHeaderAddress(value) {
   }
   const directMatch = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   return directMatch ? directMatch[0].trim() : "";
+}
+
+function buildMimeMessage(mail, recipient) {
+  const boundary = `smtp2worker-${crypto.randomUUID()}`;
+  const headers = [
+    `From: ${formatAddressHeader(mail.fromHeader, mail.from)}`,
+    `To: ${formatAddressHeader(recipient, recipient)}`,
+    `Subject: ${encodeHeaderValue(mail.subject)}`,
+    `Date: ${new Date().toUTCString()}`,
+    `Message-ID: <${crypto.randomUUID()}@smtp2worker.local>`,
+    "MIME-Version: 1.0",
+  ];
+
+  if (mail.replyTo) {
+    headers.push(`Reply-To: ${formatAddressHeader(mail.replyTo, mail.replyTo)}`);
+  }
+
+  if (mail.text && mail.html) {
+    return [
+      ...headers,
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      "",
+      `--${boundary}`,
+      mimePart("text/plain", mail.text),
+      `--${boundary}`,
+      mimePart("text/html", mail.html),
+      `--${boundary}--`,
+      "",
+    ].join("\r\n");
+  }
+
+  return [
+    ...headers,
+    mail.html ? mimePart("text/html", mail.html) : mimePart("text/plain", mail.text),
+    "",
+  ].join("\r\n");
+}
+
+function mimePart(contentType, content) {
+  return [
+    `Content-Type: ${contentType}; charset=UTF-8`,
+    "Content-Transfer-Encoding: base64",
+    "",
+    wrapBase64(base64Utf8(content)),
+  ].join("\r\n");
+}
+
+function formatAddressHeader(value, fallbackAddress) {
+  const text = sanitizeHeaderValue(value);
+  const angleMatch = text.match(/^(.*?)<([^<>@\s]+@[^<>\s]+)>$/);
+  if (angleMatch) {
+    const name = angleMatch[1].trim().replace(/^"|"$/g, "");
+    const address = angleMatch[2].trim();
+    return name ? `${encodeHeaderValue(name)} <${address}>` : address;
+  }
+  const address = firstHeaderAddress(text) || fallbackAddress;
+  return sanitizeHeaderValue(address);
+}
+
+function encodeHeaderValue(value) {
+  const text = sanitizeHeaderValue(value);
+  if (/^[\x20-\x7e]*$/.test(text)) {
+    return text;
+  }
+  return `=?UTF-8?B?${base64Utf8(text)}?=`;
+}
+
+function sanitizeHeaderValue(value) {
+  return String(value || "")
+    .replace(/[\r\n]+/g, " ")
+    .trim();
+}
+
+function base64Utf8(value) {
+  const bytes = new TextEncoder().encode(String(value || ""));
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+
+function wrapBase64(value) {
+  return String(value).replace(/.{1,76}/g, "$&\r\n").trimEnd();
 }
 
 function textToHtml(text) {

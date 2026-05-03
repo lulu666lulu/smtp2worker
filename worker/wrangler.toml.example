@@ -3,12 +3,18 @@ main = "src/worker.js"
 compatibility_date = "2026-05-03"
 
 [vars]
-FROM_EMAIL = "验证码 <noreply@example.com>"
+FROM_EMAIL = "Verification Code <noreply@example.com>"
 DEFAULT_SUBJECT = "验证码"
-# 可选：只允许发送到这些收件人域名，留空则不限制。
+# Optional: only allow recipients from these domains. Leave unset to rely on Cloudflare Email Routing verification.
 # ALLOWED_RECIPIENT_DOMAINS = "example.com,example.org"
 # DRY_RUN = "true"
 
-# 用 wrangler secret put 设置：
+[[send_email]]
+name = "SEND_EMAIL"
+# Optional Cloudflare-side restrictions:
+# destination_address = "user@example.com"
+# allowed_destination_addresses = [ "user@example.com", "user2@example.com" ]
+# allowed_sender_addresses = [ "noreply@example.com" ]
+
+# Set with wrangler secret put:
 # BRIDGE_TOKEN
-# RESEND_API_KEY
