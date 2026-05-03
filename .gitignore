@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+.env
+worker/.wrangler/
+worker/node_modules/
+worker/wrangler.toml

@@ -1,0 +1,14 @@
+name = "smtp2http-mail-worker"
+main = "src/worker.js"
+compatibility_date = "2026-05-03"
+
+[vars]
+FROM_EMAIL = "验证码 <noreply@example.com>"
+DEFAULT_SUBJECT = "验证码"
+# 可选：只允许发送到这些收件人域名，留空则不限制。
+# ALLOWED_RECIPIENT_DOMAINS = "example.com,example.org"
+# DRY_RUN = "true"
+
+# 用 wrangler secret put 设置：
+# BRIDGE_TOKEN
+# RESEND_API_KEY
