@@ -1,0 +1,12 @@
+services:
+  smtp2worker:
+    build: .
+    image: smtp2worker:latest
+    env_file:
+      - .env
+    environment:
+      # Inside Docker the SMTP server must bind all interfaces so the port mapping works.
+      SMTP_LISTEN_HOST: 0.0.0.0
+    ports:
+      - "${SMTP_LISTEN_PORT:-2525}:${SMTP_LISTEN_PORT:-2525}"
+    restart: unless-stopped
