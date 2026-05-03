@@ -82,7 +82,9 @@ function normalizeMail(payload, env) {
   const message = payload?.message || {};
   const to = normalizeRecipients(envelope.to || message.to);
   const replyTo = firstHeaderAddress(message.replyTo);
-  const fromHeader = env.FROM_EMAIL || message.from || envelope.from;
+  const fromHeader = isEnabled(env.FORCE_FROM_EMAIL)
+    ? env.FROM_EMAIL || message.from || envelope.from
+    : message.from || envelope.from || env.FROM_EMAIL;
   const from = firstHeaderAddress(fromHeader) || firstHeaderAddress(envelope.from);
   const text = message.text || (message.html ? stripHtml(message.html) : "");
   const html = message.html || (text ? textToHtml(text) : "");
@@ -264,6 +266,10 @@ function splitList(value) {
     .split(",")
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean);
+}
+
+function isEnabled(value) {
+  return String(value || "").toLowerCase() === "true";
 }
 
 function json(body, status = 200) {

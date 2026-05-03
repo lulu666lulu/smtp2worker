@@ -19,7 +19,7 @@
 cp wrangler.toml.example wrangler.toml
 ```
 
-先在 Cloudflare 对应域名启用 Email Routing，并至少验证一个目标邮箱。`FROM_EMAIL` 必须是已启用 Email Routing 的域名下的发件地址，例如 `noreply@example.com`。
+先在 Cloudflare 对应域名启用 Email Routing，并至少验证一个目标邮箱。SMTP 邮件里的 From 必须是已启用 Email Routing 的域名下的发件地址，例如 `noreply@example.com`。
 
 复制 `wrangler.toml.example` 后，确认其中有 `[[send_email]]` binding：
 
@@ -86,7 +86,7 @@ Encryption: none
 From: 你在 Cloudflare Email Routing 域名下的发件地址
 ```
 
-Worker 默认使用 `FROM_EMAIL` 覆盖 SMTP 邮件里的 From，这是因为 Cloudflare 要求发件地址来自已启用 Email Routing 的域名。
+Worker 默认优先使用 SMTP 邮件里的 From。`FROM_EMAIL` 只是兜底值；如果某个旧工具不能配置合法发件地址，可以在 Worker 变量里设置 `FORCE_FROM_EMAIL=true` 来强制覆盖。
 
 ## Docker
 

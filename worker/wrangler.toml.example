@@ -3,7 +3,10 @@ main = "src/worker.js"
 compatibility_date = "2026-05-03"
 
 [vars]
+# Fallback only. By default the Worker uses the SMTP From address.
 FROM_EMAIL = "Verification Code <noreply@example.com>"
+# Set true if your SMTP client cannot send a Cloudflare Email Routing sender address.
+# FORCE_FROM_EMAIL = "true"
 DEFAULT_SUBJECT = "验证码"
 # Optional: only allow recipients from these domains. Leave unset to rely on Cloudflare Email Routing verification.
 # ALLOWED_RECIPIENT_DOMAINS = "example.com,example.org"
