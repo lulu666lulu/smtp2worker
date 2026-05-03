@@ -4,3 +4,4 @@ __pycache__/
 worker/.wrangler/
 worker/node_modules/
 worker/wrangler.toml
+config.env

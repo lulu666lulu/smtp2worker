@@ -57,23 +57,20 @@ python smtp2worker.py ^
 
 Linux/macOS shell 把 `^` 换成 `\` 即可。
 
-也可以用环境变量：
+也可以用 `.env`，程序启动时会自动读取当前目录下的 `.env`。为了兼容旧配置名，也会自动读取 `config.env`：
 
 ```bash
 copy config.example.env .env
-```
-
-PowerShell 载入示例：
-
-```powershell
-Get-Content .env | ForEach-Object {
-  if ($_ -and -not $_.StartsWith("#")) {
-    $name, $value = $_.Split("=", 2)
-    [Environment]::SetEnvironmentVariable($name, $value, "Process")
-  }
-}
 python .\smtp2worker.py
 ```
+
+如果想指定别的配置文件：
+
+```powershell
+python .\smtp2worker.py --env-file .\config.env
+```
+
+优先级是：命令行参数 > 当前 shell 里的环境变量 > `.env` > `config.env`。
 
 旧工具里的 SMTP 配置：
 

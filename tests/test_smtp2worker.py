@@ -1,8 +1,10 @@
 import base64
+import os
+import tempfile
 import unittest
 from email.message import EmailMessage
 
-from smtp2worker import build_payload, extract_path
+from smtp2worker import build_payload, extract_path, load_dotenv, parse_dotenv_value
 
 
 class PayloadTests(unittest.TestCase):
@@ -56,6 +58,33 @@ class AddressTests(unittest.TestCase):
 
     def test_rejects_unclosed_angle_path(self):
         self.assertIsNone(extract_path("<user@example.com"))
+
+
+class DotenvTests(unittest.TestCase):
+    def test_parses_quoted_value(self):
+        self.assertEqual(parse_dotenv_value('"line\\nnext"'), "line\nnext")
+        self.assertEqual(parse_dotenv_value("'literal'"), "literal")
+
+    def test_loads_dotenv_without_overriding_existing_environment(self):
+        previous = os.environ.get("SMTP2WORKER_TEST_VALUE")
+        os.environ["SMTP2WORKER_TEST_VALUE"] = "from-env"
+        try:
+            with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as file:
+                file.write("SMTP2WORKER_TEST_VALUE=from-file\n")
+                file.write("SMTP2WORKER_TEST_OTHER=\"hello\"\n")
+                path = file.name
+            try:
+                self.assertTrue(load_dotenv(path))
+                self.assertEqual(os.environ["SMTP2WORKER_TEST_VALUE"], "from-env")
+                self.assertEqual(os.environ["SMTP2WORKER_TEST_OTHER"], "hello")
+            finally:
+                os.unlink(path)
+                os.environ.pop("SMTP2WORKER_TEST_OTHER", None)
+        finally:
+            if previous is None:
+                os.environ.pop("SMTP2WORKER_TEST_VALUE", None)
+            else:
+                os.environ["SMTP2WORKER_TEST_VALUE"] = previous
 
 
 if __name__ == "__main__":

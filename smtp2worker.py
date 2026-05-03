@@ -498,8 +498,61 @@ async def run(config: Config) -> None:
         await server.serve_forever()
 
 
+def load_dotenv(path: str, override: bool = False) -> bool:
+    if not os.path.exists(path):
+        return False
+
+    with open(path, "r", encoding="utf-8-sig") as file:
+        for raw_line in file:
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            if line.startswith("export "):
+                line = line[7:].lstrip()
+
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if not key:
+                continue
+            if not override and key in os.environ:
+                continue
+
+            os.environ[key] = parse_dotenv_value(value)
+    return True
+
+
+def parse_dotenv_value(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        quote = value[0]
+        value = value[1:-1]
+        if quote == '"':
+            value = (
+                value.replace("\\n", "\n")
+                .replace("\\r", "\r")
+                .replace("\\t", "\t")
+                .replace('\\"', '"')
+                .replace("\\\\", "\\")
+            )
+    return value
+
+
+def default_env_files(argv: list[str]) -> list[str]:
+    env_files = [".env", "config.env"]
+    for index, item in enumerate(argv):
+        if item == "--env-file" and index + 1 < len(argv):
+            env_files.insert(0, argv[index + 1])
+        elif item.startswith("--env-file="):
+            env_files.insert(0, item.split("=", 1)[1])
+    return env_files
+
+
 def parse_args(argv: list[str]) -> Config:
+    for env_file in default_env_files(argv):
+        load_dotenv(env_file)
+
     parser = argparse.ArgumentParser(description="SMTP to Cloudflare Worker mail bridge")
+    parser.add_argument("--env-file", default=None, help="Load environment variables from this dotenv file")
     parser.add_argument("--listen-host", default=os.getenv("SMTP_LISTEN_HOST", "127.0.0.1"))
     parser.add_argument("--listen-port", type=int, default=int(os.getenv("SMTP_LISTEN_PORT", "2525")))
     parser.add_argument("--worker-url", default=os.getenv("WORKER_URL"))
